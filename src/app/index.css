@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        font-family: "Lato", sans-serif;
+    }
+}
+
+.custom-upload .ant-upload-wrapper.ant-upload-picture-card-wrapper .ant-upload.ant-upload-select,
+.custom-upload .ant-upload-wrapper.ant-upload-picture-circle-wrapper .ant-upload.ant-upload-select {
+    width: var(--upload-size);
+    height: var(--upload-size);
+}
