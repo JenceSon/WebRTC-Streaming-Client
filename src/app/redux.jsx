@@ -67,7 +67,7 @@ export const loginSystemState = (data) => async dispatch => {
 
 export const logoutSystemState = async () => {
     try {
-        const url = '/api/public/v1/authentication/logout';
+        const url = '/api/v1/authentication/log-out';
         await T.client.post(url);
         T.message.success('Đăng xuất thành công!');
         return true;

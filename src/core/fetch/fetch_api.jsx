@@ -30,19 +30,19 @@ async function apiFetch({
             data = method !== 'GET' ? JSON.stringify(data) : undefined;
         }
         if (loading) T.showLoading();
-        const fetchApi = () => fetch(url.href, {
+        const fetchApi = async () => await fetch(url.href, {
             method: method,
             body: data,
             credentials: 'include',
             headers: {
                 ...defaultHeaders,
                 ...headers,
-                Authorization: `Bearer ${T.localStorage.storage('authorization').accessToken || ''}`
+                Authorization: T.localStorage.storage('authorization').accessToken ? `Bearer ${T.localStorage.storage('authorization').accessToken}` : undefined
             },
             ...options,
         });
         let response = await fetchApi();
-        if (response.status == 401) {
+        if (response.status == 401 && refreshToken) {
             const getTokenUrl = new URL(apiURL + '/api/public/v1/authentication/access-token');
             getTokenUrl.searchParams.append('refreshToken', refreshToken);
             response = await fetch(getTokenUrl.href, {
@@ -52,11 +52,15 @@ async function apiFetch({
                     ...defaultHeaders
                 }
             });
-            if (!response.ok()) throw new Error('Require login!');
+            if (!response.ok) throw new Error('Require login!');
             await response.json().then(({ accessToken }) => accessToken && T.localStorage.storage('authorization', { accessToken, refreshToken }));
             response = await fetchApi();
         }
-        responseData = await response.json();
+        try {
+            responseData = await response.json();
+        } catch (error) {
+            responseData = {};
+        }
         if (loading) T.hideLoading();
 
         if (responseData.error || !response.ok) {

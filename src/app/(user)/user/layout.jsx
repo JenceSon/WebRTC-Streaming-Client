@@ -12,7 +12,6 @@ export default function RootLayout({ children }) {
     const [menus, setMenus] = useState([]);
     const router = useAppRouter();
     const dispatch = useAppDispatch();
-    let socket;
     useEffect(() => {
         dispatch(fetchSystemState()).then(result => {
             if (result === false) {
@@ -21,8 +20,7 @@ export default function RootLayout({ children }) {
             const menus = loadMenu();
             setMenus(menus);
         });
-        socket = T.socket.create('/signal');
-        return socket.close;
+        return () => T.socket.close();
     }, []);
 
     return (

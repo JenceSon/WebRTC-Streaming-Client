@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { useAppRouter } from '@/hooks/router_hook';
 import { fetchSystemState, loginSystemState, signUpSystemState } from '@/app/redux';
 import { useAppDispatch } from '@/hooks/redux_hooks';
+import { T } from '../common';
 
 export default function LoginPage() {
     const dispatch = useAppDispatch();
@@ -15,6 +16,9 @@ export default function LoginPage() {
         dispatch(fetchSystemState()).then(result => {
             if (result) {
                 router.push('/user');
+            }
+            else {
+                T.localStorage.storage('authorization', {});
             }
         });
     }, []);

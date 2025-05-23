@@ -9,11 +9,14 @@ import { CSSTransition, SwitchTransition, TransitionGroup } from 'react-transiti
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux_hooks';
 import Link from 'next/link';
+import { logoutSystemState } from '@/app/redux';
 import { useAppRouter } from '@/hooks/router_hook';
 import { T } from '@/app/common';
 
 const { Content } = Layout;
 
+const systemStateUserSetDetail = 'systemStateUser:SetDetail';
+const systemStateMenusSetList = 'systemStateMenus:SetList';
 export function AdminLayout({ children, menus }) {
     const user = useAppSelector('systemState', 'userReducer').user;
     let items = [
@@ -64,9 +67,13 @@ export function AdminLayout({ children, menus }) {
     const actionTypeDropDown = {
         'LOG_OUT': () => Modal.confirm({
             title: 'Xác nhận đăng xuất khỏi hệ thống',
-            onOk: () => {
-                T.localStorage.storage('authorization', {});
-                router.push('/login');
+            onOk: async () => {
+                const result = await logoutSystemState();
+                if (result) {
+                    T.localStorage.storage('authorization', {});
+                    router.push('/login');
+                    dispatch({ type: systemStateUserSetDetail, payload: { user: null } });
+                }
             },
             okButtonProps: { icon: <CheckOutlined /> },
             cancelButtonProps: { icon: <CloseOutlined /> }

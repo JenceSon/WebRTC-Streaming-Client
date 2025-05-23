@@ -92,7 +92,22 @@ const T = {
     },
     //socket---------------------------------------------------------------------
     socket: {
-        create: (path) => new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}${path}`)
+        _singleton: {},
+        create: (path = '/signal') => {
+            if (!T.socket._singleton[path]) {
+                const socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}${path}`);
+                T.socket._singleton[path] = socket;
+                return socket;
+            }
+            else return T.socket._singleton[path];
+        },
+        singleton: (path = '/signal') => T.socket._singleton[path] || T.socket.create(path),
+        close: (path = '/signal') => {
+            if (T.socket._singleton[path]) {
+                T.socket._singleton[path].close();
+                T.socket._singleton[path] = undefined;
+            }
+        }
     }
 };
 
