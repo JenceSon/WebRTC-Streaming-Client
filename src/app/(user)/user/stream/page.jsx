@@ -3,8 +3,8 @@
 import { T } from '@/app/common';
 import { useEffect, useRef } from 'react';
 import AdminPage from '../../components/admin_page';
-import { FileOutlined, ReloadOutlined, SendOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons';
-import { Button, Space, Table, Upload } from 'antd';
+import { DisconnectOutlined, FileOutlined, ReloadOutlined, SendOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons';
+import { Button, Col, Flex, Row, Space, Table, Upload } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux_hooks';
 import { getPageStream } from './redux';
 import { TooltipButton } from '@/components/button';
@@ -14,8 +14,9 @@ export default function StreamPage() {
     const localVideoRef = useRef();
     const remoteVideoRef = useRef();
     const hiddenVideoRef = useRef();
-    const webRtc = useWebRtc();
-    const { connectPeer, stream, peer } = webRtc;
+    const toSession = useRef();
+    const { connectPeer, stream, getPeer, disconnectStream } = useWebRtc();
+    const peer = getPeer();
 
     const list = useAppSelector('stream').list;
     const dispatch = useAppDispatch();
@@ -24,7 +25,7 @@ export default function StreamPage() {
 
     useEffect(() => {
         getPage();
-        peer().ontrack = e => {
+        getPeer().ontrack = e => {
             remoteVideoRef.current.srcObject = e.streams[0];
         };
     }, []);
@@ -40,8 +41,7 @@ export default function StreamPage() {
             title: 'Action',
             render: (_, record) => (
                 <Space size='small'>
-                    <TooltipButton title='Request connect' className='!bg-green-500 hover:!opacity-75' icon={<SwapOutlined />} onClick={() => connectPeer(record.id)} />
-                    <TooltipButton title='Start Stream' icon={<SendOutlined />} onClick={() => stream(record.id)} />
+                    <TooltipButton title='Request connect' className='!bg-green-500 hover:!opacity-75' icon={<SwapOutlined />} onClick={() => { connectPeer(record.id); toSession.current = record.id; }} />
                 </Space>
             )
         }
@@ -53,7 +53,11 @@ export default function StreamPage() {
             await hiddenVideoRef.current.play();
             const stream = hiddenVideoRef.current.captureStream();
             localVideoRef.current.srcObject = stream;
-            stream.getTracks().forEach(track => peer().addTrack(track, stream));
+            const peer = getPeer();
+            const videoTrack = stream.getVideoTracks()[0];
+            peer.videoTransceiver.sender.replaceTrack(videoTrack);
+            const audioTrack = stream.getAudioTracks()[0];
+            peer.audioTransceiver.sender.replaceTrack(audioTrack);
         } catch (error) {
             console.error(error);
             T.message.error(error);
@@ -70,13 +74,29 @@ export default function StreamPage() {
                 }
             ]}
         >
-            <video ref={localVideoRef} autoPlay playsInline muted className="w-64 border" />
-            <video ref={remoteVideoRef} autoPlay playsInline muted className="w-64 border" />
             <video ref={hiddenVideoRef} playsInline muted className='hidden' />
-            <Upload beforeUpload={handleBeforeUpload} showUploadList={false} accept='video/*'>
-                <Button icon={<UploadOutlined />}>Click to Upload</Button>
-            </Upload>
-            <TooltipButton title='Reload' icon={<ReloadOutlined />} onClick={getPage} />
+            <Row gutter={16}>
+                <Col span={11}>
+                    <Flex justify='center' align='center' gap='small' vertical>
+                        <video ref={localVideoRef} autoPlay playsInline muted className='border' />
+                        <Upload beforeUpload={handleBeforeUpload} showUploadList={false} accept='video/*'>
+                            <Button icon={<UploadOutlined />}>Click to Upload</Button>
+                        </Upload>
+                    </Flex>
+                </Col>
+                <Col span={2}>
+                    <Flex justify='center' align='center' gap='small' vertical className='h-full'>
+                        <TooltipButton title='Start Stream' icon={<SendOutlined />} onClick={() => stream(toSession.current)} />
+                        <TooltipButton title='Disconnect' icon={<DisconnectOutlined />} color='danger' onClick={() => disconnectStream(toSession.current)} />
+                    </Flex>
+                </Col>
+                <Col span={11}>
+                    <video ref={remoteVideoRef} autoPlay playsInline muted className='border self-center justify-self-center' />
+                </Col>
+            </Row>
+            <Flex justify='right'>
+                <TooltipButton title='Reload' icon={<ReloadOutlined />} onClick={getPage} />
+            </Flex>
             <Table columns={columns} dataSource={list} />
         </AdminPage>
     );
