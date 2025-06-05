@@ -1,7 +1,7 @@
-import { ProfileOutlined } from '@ant-design/icons';
+import { PhoneOutlined } from '@ant-design/icons';
 const menu = {
     menuKey: 2100,
-    label: 'Stream p2p',
-    icon: <ProfileOutlined />
+    label: 'Stream P2P',
+    icon: <PhoneOutlined />
 };
 export default menu;

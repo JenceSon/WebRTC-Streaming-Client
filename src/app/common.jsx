@@ -95,7 +95,17 @@ const T = {
         _singleton: {},
         create: (path = '/signal') => {
             if (!T.socket._singleton[path]) {
-                const socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}${path}`);
+                const { refreshToken } = T.localStorage.storage('authorization');
+                let socket;
+                if (refreshToken) socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}${path}?token=${refreshToken}`);
+                else socket = new WebSocket(`${process.env.NEXT_PUBLIC_WEBSOCKET_URL}/guest`);
+                socket.onopen = () => console.log(`${path}: Websocket connected`);
+                socket.onclose = event => {
+                    console.log(`${path}: Websocket closed - ${event.code}`);
+                };
+                socket.onerror = (error) => {
+                    console.error(`${path}: ${error}`);
+                };
                 T.socket._singleton[path] = socket;
                 return socket;
             }
