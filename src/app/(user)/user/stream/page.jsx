@@ -3,8 +3,8 @@
 import { T } from '@/app/common';
 import { useEffect, useRef, useState } from 'react';
 import AdminPage from '@/app/(user)/components/admin_page';
-import { CloseOutlined, FileOutlined, PauseCircleOutlined, PhoneOutlined, PlayCircleOutlined, PoweroffOutlined, ReloadOutlined, UploadOutlined, VideoCameraAddOutlined } from '@ant-design/icons';
-import { Alert, Col, Flex, Row, Space, Table, Typography, Upload } from 'antd';
+import { CloseOutlined, FileOutlined, PauseCircleOutlined, PhoneOutlined, PlayCircleOutlined, PoweroffOutlined, ReloadOutlined, StopOutlined, UploadOutlined, VideoCameraAddOutlined } from '@ant-design/icons';
+import { Alert, Col, Flex, FloatButton, Row, Space, Table, Typography, Upload } from 'antd';
 import { useAppDispatch, useAppSelector } from '@/hooks/redux_hooks';
 import { getPageStream } from './redux';
 import { TooltipButton } from '@/components/button';
@@ -14,6 +14,7 @@ export default function StreamPage() {
     const localVideoRef = useRef();
     const remoteVideoRef = useRef();
     const hiddenVideoRef = useRef();
+    const webcamRef = useRef();
     const ontrack = e => {
         remoteVideoRef.current.srcObject = e.streams[0];
     };
@@ -40,7 +41,7 @@ export default function StreamPage() {
             width: '25%',
             render: (_, record) => (
                 <Space size='small'>
-                    <TooltipButton title='Request connect' className='!bg-green-500 hover:!opacity-75' icon={<VideoCameraAddOutlined />} onClick={() => connectPeer(record.sessionId)} />
+                    <TooltipButton title='Request connect' className='!bg-green-500 hover:!opacity-75' icon={<PhoneOutlined />} onClick={() => connectPeer(record.sessionId)} />
                 </Space>
             )
         }
@@ -64,12 +65,33 @@ export default function StreamPage() {
     };
 
     const handleClearSrc = async () => {
-        hiddenVideoRef.current.pause();
-        hiddenVideoRef.current.removeAttribute('src');
-        hiddenVideoRef.current.load();
-        localVideoRef.current.removeAttribute('srcObject');
-        localVideoRef.current.load();
-        await setDefaultTrack();
+        try {
+            hiddenVideoRef.current.pause();
+            hiddenVideoRef.current.removeAttribute('src');
+            hiddenVideoRef.current.load();
+            webcamRef.current?.getTracks().forEach(track => track.stop() || webcamRef.current.removeTrack(track));
+            webcamRef.current = undefined;
+            localVideoRef.current.removeAttribute('srcObject');
+            localVideoRef.current.load();
+            await setDefaultTrack();
+        } catch (error) {
+            T.message.error(error);
+        }
+    };
+
+    const handleUsingWebcam = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            webcamRef.current = stream;
+            localVideoRef.current.srcObject = stream;
+            const peer = getPeer();
+            const videoTrack = stream.getVideoTracks()[0];
+            peer.videoTransceiver.sender.replaceTrack(videoTrack);
+            const audioTrack = stream.getAudioTracks()[0];
+            peer.audioTransceiver.sender.replaceTrack(audioTrack);
+        } catch (error) {
+            T.message.error(error);
+        }
     };
 
     return (
@@ -107,9 +129,6 @@ export default function StreamPage() {
                             <Flex align='flex-start' gap='small' className='w-1/4 justify-self-center self-center'>
                                 <video ref={localVideoRef} autoPlay playsInline muted className='w-full aspect-video border justify-self-center self-center' />
                                 <Space direction='vertical' size='small'>
-                                    <Upload beforeUpload={handleBeforeUpload} showUploadList={false} accept='video/*'>
-                                        <TooltipButton icon={<UploadOutlined />} />
-                                    </Upload>
                                     <TooltipButton title='Clear source' icon={<CloseOutlined />} onClick={handleClearSrc} color='default' variant='outlined' />
                                 </Space>
                             </Flex>
@@ -128,6 +147,12 @@ export default function StreamPage() {
                     <Table columns={columns} dataSource={list} rowKey='id' />
                 </Col>
             </Row>
+            <FloatButton.Group>
+                <Upload beforeUpload={handleBeforeUpload} showUploadList={false} accept='video/*'>
+                    <FloatButton icon={<UploadOutlined />} tooltip='Upload video' />
+                </Upload>
+                <FloatButton tooltip='Using webcam' icon={<VideoCameraAddOutlined />} onClick={handleUsingWebcam} />
+            </FloatButton.Group>
         </AdminPage>
     );
 }

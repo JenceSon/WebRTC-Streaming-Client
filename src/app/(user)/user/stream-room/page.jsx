@@ -11,12 +11,12 @@ export default function StreamRoomPage() {
     const [form] = Form.useForm();
 
     const handleJoinRoom = async ({ roomId }) => {
-
+        router.push(`stream-room/mesh/${roomId}`);
     };
 
     const handleCreateRoom = async () => {
         const roomId = await createRoomSmManageRooms();
-        if (roomId) router.push(`stream-room/${roomId}`);
+        if (roomId) router.push(`stream-room/mesh/${roomId}`);
     };
 
     return (
@@ -47,14 +47,12 @@ export default function StreamRoomPage() {
                     <Button type='primary' icon={<VideoCameraAddOutlined />} onClick={handleCreateRoom}>
                         Start new group call
                     </Button>
-                    <Divider className='!w-1/3'>
-                        OR
-                    </Divider>
+                    <Typography.Text strong>OR</Typography.Text>
                     <Flex gap='small' justify='center' align='flex-start' className='!w-full'>
                         <Form.Item name='roomId' rules={[{ required: true, message: 'Please enter id of group call' }]} className='!w-1/4'>
                             <Input className='!w-full' prefix={<IdcardOutlined />} placeholder='Join in a group call' />
                         </Form.Item>
-                        <Button className='!border-none !shadow-none'>
+                        <Button className='!border-none !shadow-none' onClick={form.submit}>
                             Join
                         </Button>
                     </Flex>

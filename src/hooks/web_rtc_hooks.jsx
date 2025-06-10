@@ -46,24 +46,23 @@ export const useWebRtc = ({ socketPath = '/signal', ontrack }) => {
         };
 
         const sendExchangeIce = () => {
-            if (!isSendingIce.current) return;
             if (iceCandidates.current.length) T.socket.singleton(socketPath).send(JSON.stringify({ type: EXCHANGE_ICE, data: iceCandidates.current.shift() }));
+            if (!iceCandidates.current.length && !isSendingIce.current) return console.log('Exchange ice done');
             setTimeout(sendExchangeIce, 100);
         };
 
         peerRef.current.onicecandidate = (event) => {
             if (event.candidate) {
+                const { candidate, sdpMid, sdpMLineIndex } = event.candidate;
+                iceCandidates.current.push({ candidate, sdpMid, sdpMLineIndex });
                 if (!isSendingIce.current) {
                     isSendingIce.current = true;
                     sendExchangeIce();
                 };
-                const { candidate, sdpMid, sdpMLineIndex } = event.candidate;
-                iceCandidates.current.push({ candidate, sdpMid, sdpMLineIndex });
             }
             else {
                 console.log('Gathering ice done', iceCandidates.current.length);
                 isSendingIce.current = false;
-                iceCandidates.current = [];
             }
         };
 
@@ -82,7 +81,7 @@ export const useWebRtc = ({ socketPath = '/signal', ontrack }) => {
         }
     };
 
-    const setupSocket = () => {
+    const setUpSocket = () => {
         const socket = T.socket.singleton(socketPath);
         const handleMsg = async msg => {
             try {
@@ -133,7 +132,7 @@ export const useWebRtc = ({ socketPath = '/signal', ontrack }) => {
                             T.message.info('The connection has been released!');
                             break;
                         default:
-                            T.message.error(`Unknow message from sever: ${type}`);
+                            T.message.error(`Unknown message from sever: ${type}`);
                             break;
                     }
                 }
@@ -146,8 +145,7 @@ export const useWebRtc = ({ socketPath = '/signal', ontrack }) => {
         socket.addEventListener('message', handleMsg);
     };
     useEffect(() => {
-        setupSocket();
-        setUpPeer();
+        setUpPeer().then(setUpSocket);
         return () => T.socket.close(socketPath) || peerRef.current.close();
     }, []);
     const connectPeer = (to) => {
