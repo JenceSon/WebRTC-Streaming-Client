@@ -3,15 +3,22 @@
 import { useEffect, useRef, useState } from 'react';
 import { topics } from './web_rtc_hooks';
 import { T } from '@/app/common';
+import { useAppSelector } from './redux_hooks';
+import { useAppRouter } from './router_hook';
 
 export const meshTopics = {
     NEW_PARTICIPANT: 'new_participant',
-    LEAVED_PARTICIPANT: 'leaved_participant',
+    LEFT_PARTICIPANT: 'left_participant',
     RELEASE_ROOM: 'release_room',
     JOIN_ROOM: 'join_room'
 };
-const { NEW_PARTICIPANT, LEAVED_PARTICIPANT, RELEASE_ROOM, JOIN_ROOM } = meshTopics;
+export const meshConst = {
+    SND_EP: 'snd_ep',
+    RCV_EP: 'rcv_ep'
+};
+const { NEW_PARTICIPANT, LEFT_PARTICIPANT, RELEASE_ROOM, JOIN_ROOM } = meshTopics;
 const { ANSWER, EXCHANGE_ICE, CONNECT, DISCONNECT, OFFER } = topics;
+const { SND_EP, RCV_EP } = meshConst;
 const options = {
     iceServers: [
         { urls: 'stun:stun.l.google.com:19302' }
@@ -26,6 +33,8 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
     const isSendingIceSnd = useRef(false);
     const sndPeerRef = useRef();
     const defaultVideoRef = useRef();
+    const router = useAppRouter();
+    const user = useAppSelector('systemState', 'userReducer').user;
     const [state, setState] = useState({
         rcvPeers: {}
     });
@@ -42,8 +51,8 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
         };
 
         const sendExchangeIce = () => {
-            if (sndIceCandidates.current.length) T.socket.singleton(socketPath).send(JSON.stringify({ type: EXCHANGE_ICE, data: sndIceCandidates.current.shift(), epOwnerId: '' }));
-            if (!sndIceCandidates.current.length && !isSendingIceSnd.current) return console.log('Exchange ice done');
+            if (sndIceCandidates.current.length) T.socket.singleton(socketPath).send(JSON.stringify({ type: EXCHANGE_ICE, candidate: sndIceCandidates.current.shift(), iceExchangerId: '', epType: SND_EP }));
+            if (!sndIceCandidates.current.length && !isSendingIceSnd.current) return console.log('Exchange ice for sndPeer done');
             setTimeout(sendExchangeIce, 100);
         };
 
@@ -57,7 +66,7 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
                 };
             }
             else {
-                console.log('Gathering ice done', sndIceCandidates.current.length);
+                console.log('Gathering ice for sndPeer done');
                 isSendingIceSnd.current = false;
             }
         };
@@ -88,8 +97,8 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
         };
 
         const sendExchangeIce = () => {
-            if (rcvIceCandidates.current[id].length) T.socket.singleton(socketPath).send(JSON.stringify({ type: EXCHANGE_ICE, data: rcvIceCandidates.current[id].shift(), epOwnerId: id }));
-            if (!rcvIceCandidates.current[id].length && !isSendingIceRcv.current[id]) return console.log('Exchange ice done');
+            if (rcvIceCandidates.current[id].length) T.socket.singleton(socketPath).send(JSON.stringify({ type: EXCHANGE_ICE, candidate: rcvIceCandidates.current[id].shift(), iceExchangerId: id, epType: RCV_EP }));
+            if (!rcvIceCandidates.current[id].length && !isSendingIceRcv.current[id]) return console.log(`Exchange ice for ${id} done`);
             setTimeout(sendExchangeIce, 100);
         };
 
@@ -103,7 +112,7 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
                 };
             }
             else {
-                console.log('Gathering ice done', rcvIceCandidates.current[id].length);
+                console.log(`Gathering ice for ${id} done`);
                 isSendingIceRcv.current[id] = false;
             }
         };
@@ -120,57 +129,69 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
 
     const setUpSocket = () => {
         const socket = T.socket.singleton(socketPath);
+        const handleTopic = {
+            [ANSWER]: async message => {
+                const { type, sdpAnswer: sdp, answerRcverId, epType } = message;
+                if (epType == SND_EP) await sndPeerRef.current.setRemoteDescription({ type, sdp });
+                else await rcvPeersRef.current[answerRcverId].setRemoteDescription({ type, sdp });
+            },
+            [EXCHANGE_ICE]: async message => {
+                const { candidate, iceExchangerId, epType } = message;
+                if (epType == SND_EP) await sndPeerRef.current.addIceCandidate(candidate);
+                else await rcvPeersRef.current[iceExchangerId].addIceCandidate(candidate);
+            },
+            [NEW_PARTICIPANT]: async message => {
+                const { sessionId, user } = message;
+                const { id, newRcvPeer } = setUpNewRcvPeer(sessionId);
+                const sdpOffer = await newRcvPeer.createOffer();
+                await newRcvPeer.setLocalDescription(sdpOffer);
+                socket.send(JSON.stringify({ type: OFFER, sdpOffer: sdpOffer.sdp, offerSnderId: id, epType: RCV_EP }));
+                T.message.info(`${T.string.toUpperCase(user.username, 'word')} has joined in room`);
+                setState(prev => ({ ...prev, rcvPeers: { ...prev.rcvPeers, [id]: user } }));
+            },
+            [LEFT_PARTICIPANT]: async message => {
+                const { sessionId, user } = message;
+                rcvPeersRef.current[sessionId].close();
+                delete rcvPeersRef.current[sessionId];
+                T.message.info(`${T.string.toUpperCase(user.username, 'word')} has left`);
+                setState(prev => ({ ...prev, rcvPeers: T.lodash.pickBy({ ...prev.rcvPeers, [sessionId]: undefined }) }));
+            },
+            [JOIN_ROOM]: async message => {
+                const { participants } = message;
+                const newRcvPeers = await Promise.all(Object.entries(participants).map(([sessionId, user]) => (async () => {
+                    const { id, newRcvPeer } = setUpNewRcvPeer(sessionId);
+                    const sdpOffer = await newRcvPeer.createOffer();
+                    await newRcvPeer.setLocalDescription(sdpOffer);
+                    socket.send(JSON.stringify({ type: OFFER, sdpOffer: sdpOffer.sdp, offerSnderId: id, epType: RCV_EP }));
+                    return { [id]: user };
+                })()));
+                setState(prev => ({ ...prev, rcvPeers: T.lodash.assign(prev.rcvPeers, ...newRcvPeers) }));
+            },
+            [CONNECT]: message => {
+                const { srcUser } = message;
+                if (user.id == srcUser.id) T.message.success('Start stream successfully');
+                else T.message.info(`${T.string.toUpperCase(srcUser.username, 'word')} has started streaming`);
+            },
+            [DISCONNECT]: message => {
+                const { srcUser } = message;
+                if (user.id == srcUser.id) T.message.success('Stop stream successfully');
+                else T.message.info(`${T.string.toUpperCase(srcUser.username, 'word')} has stopped streaming`);
+            },
+            [RELEASE_ROOM]: message => {
+                T.message.info('Room has been released by host');
+                router.push('/user/stream-room');
+            }
+        };
         const handleMsg = async msg => {
             const message = JSON.parse(msg.data);
+            const { type, error } = message;
             try {
-                const { type, data, error, mode = 'kms', epOwnerId, idParticipants } = message;
                 if (error) return T.hideLoading() || T.message.error(error);
-                if (mode == 'kms') {
-                    switch (type) {
-                        case ANSWER:
-                            if (rcvPeersRef.current[epOwnerId]) await rcvPeersRef.current[epOwnerId].setRemoteDescription({ type, sdp: data });
-                            else await sndPeerRef.current.setRemoteDescription({ type, sdp: data });
-                            break;
-                        case EXCHANGE_ICE:
-                            await rcvPeersRef.current[epOwnerId]?.addIceCandidate(data);
-                            break;
-                        case NEW_PARTICIPANT:
-                            const { id, newRcvPeer } = setUpNewRcvPeer(data);
-                            const sdpOffer = await newRcvPeer.createOffer();
-                            await newRcvPeer.setLocalDescription(sdpOffer);
-                            socket.send(JSON.stringify({ type: OFFER, data: sdpOffer.sdp, epOwnerId: id }));
-                            setState(prev => ({ ...prev, rcvPeers: { ...prev.rcvPeers, [id]: true } }));
-                            break;
-                        case LEAVED_PARTICIPANT:
-                            rcvPeersRef.current[data]?.close();
-                            delete rcvPeersRef.current[data];
-                            setState(prev => ({ ...prev, rcvPeers: T.lodash.pickBy({ ...prev.rcvPeers, [data]: undefined }) }));
-                            break;
-                        case JOIN_ROOM:
-                            const newRcvPeers = await Promise.all(idParticipants.map(id => (async () => {
-                                const { newRcvPeer } = setUpNewRcvPeer(id);
-                                const sdpOffer = await newRcvPeer.createOffer();
-                                await newRcvPeer.setLocalDescription(sdpOffer);
-                                socket.send(JSON.stringify({ type: OFFER, data: sdpOffer.sdp, epOwnerId: id }));
-                                return { [id]: true };
-                            })()));
-                            setState(prev => ({ ...prev, rcvPeers: T.lodash.assign(prev.rcvPeers, ...newRcvPeers) }));
-                            break;
-                        case CONNECT:
-                            T.message.info('Stream has been started');
-                            break;
-                        case DISCONNECT:
-                            T.message.info('Stream has been paused');
-                            break;
-                        default:
-                            T.message.error(`Unknown message from sever: ${type}`);
-                            break;
-                    }
-                }
+                handleTopic[type] ? await handleTopic[type](message) : T.message.error(`Unknown message from sever: ${type}`);
             } catch (error) {
                 console.error(`Error ${error} in ${message}`);
                 T.hideLoading();
-                T.message.error('Error handling message!');
+                T.message.error(`Error handling message ${type}!`);
             }
         };
         socket.addEventListener('message', handleMsg);
@@ -190,8 +211,8 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
         T.socket.close(socketPath);
         sndPeerRef.current.close();
         Object.values(rcvPeersRef.current).forEach(rcvPeer => rcvPeer.close());
-        defaultVideoRef.current.pause();
-        defaultVideoRef.current.removeAttribute('src');
+        defaultVideoRef.current?.pause();
+        defaultVideoRef.current?.removeAttribute('src');
     };
     const setDefaultTrack = async () => {
         const video = defaultVideoRef.current ?? document.createElement('video');
@@ -201,7 +222,7 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
         video.muted = true;
         video.loop = true;
         video.playsInline = true;
-        video.src = '/black-screen.mkv';
+        video.src = '/white_screen.mkv';
         await video.play();
         const stream = video.captureStream();
         const videoTrack = stream.getVideoTracks()[0];
@@ -209,23 +230,29 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
         const audioTrack = stream.getAudioTracks()[0];
         sndPeerRef.current.audioTransceiver.sender.replaceTrack(audioTrack);
     };
-    const connect = async () => {
+    const connect = async (...connectIds) => {
+        if (connectIds.length == 0) return T.message.warning('Haven\'t select sink connection yet!');
         const socket = T.socket.singleton(socketPath);
         if (!sndPeerRef.current.localDescription) {
             const sdpOffer = await sndPeerRef.current.createOffer();
             await sndPeerRef.current.setLocalDescription(sdpOffer);
-            socket.send(JSON.stringify({ type: OFFER, data: sdpOffer.sdp, epOwnerId: '' }));
+            socket.send(JSON.stringify({ type: OFFER, sdpOffer: sdpOffer.sdp, offerSnderId: '', epType: SND_EP }));
         }
-        socket.send(JSON.stringify({ type: CONNECT }));
+        socket.send(JSON.stringify({ type: CONNECT, connectIds }));
     };
 
 
-    const disconnect = () => T.socket.singleton(socketPath).send(JSON.stringify({ type: DISCONNECT }));
+    const disconnect = (...disconnectIds) => {
+        if (disconnectIds.length == 0) return T.message.warning('Haven\'t select sink connection yet!');
+        T.socket.singleton(socketPath).send(JSON.stringify({ type: DISCONNECT, disconnectIds }));
+    };
+
+    const release = () => T.socket.singleton(socketPath).send(JSON.stringify({ type: RELEASE_ROOM }));
 
     return {
         getSndPeer: () => sndPeerRef.current,
         getRcvPeers: () => state.rcvPeers,
         getRcvPeer: (id) => state.rcvPeers[id],
-        connect, disconnect, setDefaultTrack,
+        connect, disconnect, setDefaultTrack, release
     };
 };

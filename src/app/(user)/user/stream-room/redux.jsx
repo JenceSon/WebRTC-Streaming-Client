@@ -17,7 +17,7 @@ const redux = {
 
 export const getRoomSmManageRooms = (roomId) => async dispatch => {
     try {
-        const url = '/api/v1/streaming/rooms/item-mesh';
+        const url = '/api/v1/streaming/rooms/item';
         const room = await T.client.get(url, { roomId }).then(res => res.room);
         dispatch({ type: streamRoomCreate, payload: room });
         return { room };
@@ -30,10 +30,22 @@ export const getRoomSmManageRooms = (roomId) => async dispatch => {
 
 export const createRoomSmManageRooms = async () => {
     try {
-        const url = '/api/v1/streaming/rooms/item-mesh';
+        const url = '/api/v1/streaming/rooms/item';
         const roomId = await T.client.post(url).then(res => res.roomId);
         T.message.success('Create new group call successfully');
         return roomId;
+    } catch (error) {
+        T.message.error(error);
+        return false;
+    }
+};
+
+export const deleteRoomSmManageRooms = async roomId => {
+    try {
+        const url = '/api/v1/streaming/rooms/item';
+        await T.client.delete(url, { roomId });
+        T.message.success('Release group call successfully');
+        return true;
     } catch (error) {
         T.message.error(error);
         return false;

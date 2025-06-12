@@ -104,6 +104,7 @@ const T = {
                     console.log(`${path}: Websocket closed - ${event.code}`);
                 };
                 socket.onerror = (error) => {
+                    message.error('Error connecting socket!');
                     console.error(`${path}: ${error}`);
                 };
                 T.socket._singleton[path] = socket;
