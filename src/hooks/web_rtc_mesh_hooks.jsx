@@ -265,7 +265,7 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
                     const kind = report.kind;
                     if (kind == 'video') {
                         const { frameWidth, frameHeight, framesPerSecond, ...rest } = report;
-                        const resolution = `${frameWidth}x${frameHeight}`;
+                        const resolution = frameHeight && frameWidth && `${frameWidth}x${frameHeight}` || undefined;
                         const fps = framesPerSecond;
                         reports.video = T.lodash.merge(reports.video, { resolution, fps, ...rest });
                     }

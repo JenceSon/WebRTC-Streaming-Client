@@ -222,7 +222,7 @@ const StreamingVideo = ({ id }) => {
     });
     const getDetailStream = async () => {
         const reports = await getRcvStats(id);
-        const { resolution, codec, fps } = reports.video;
+        const { resolution = 'Unknown', codec = 'Unknown', fps = 0 } = reports.video;
         const { codec: codecAudio } = reports.audio;
         let summary = '';
         if (codec && codecAudio) {
