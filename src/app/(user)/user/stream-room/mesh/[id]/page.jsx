@@ -23,7 +23,6 @@ export default function DetailRoomPage({ params }) {
     const getRoom = async () => await dispatch(getRoomSmManageRooms(roomId));
     const room = useAppSelector('streamRoom').room;
     const user = useAppSelector('systemState', 'userReducer').user;
-    console.log('render');
     useEffect(() => {
         getRoom();
         return () => handleClearSrc(true);
@@ -113,7 +112,7 @@ export default function DetailRoomPage({ params }) {
 
     return (<>
         <AdminPage
-            title={`Room ${room.roomId}`}
+            title={<>Room <Typography.Text copyable className='!text-2xl !font-bold !text-primary'>{room.roomId}</Typography.Text></>}
             icon={<TeamOutlined />}
             breadcrumbItems={[
                 {
@@ -140,7 +139,7 @@ export default function DetailRoomPage({ params }) {
                                 <video ref={localVideoRef} autoPlay playsInline className='!w-full border aspect-video' />
                                 <TooltipButton title='Clear source' icon={<CloseOutlined />} onClick={() => handleClearSrc()} color='default' variant='outlined' className='!absolute !top-0 !right-0 z-10' />
                                 <Alert
-                                    message='You'
+                                    message={`${T.string.toUpperCase(user?.username, 'word')} (You)`}
                                     type={isHost ? 'info' : 'success'}
                                     className='w-fit rounded-xl shadow-sm !absolute bottom-0 left-1/2 -translate-x-1/2 !text-[1.0vw] !leading-[2vw] !px-[0.75vw] !py-[0.25vw]'
                                     icon={<UserOutlined />}

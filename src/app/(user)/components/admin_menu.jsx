@@ -50,7 +50,7 @@ export default function SideNav({ ...others }) {
     return (
         <Sider ref={nodeRef} breakpoint='lg' collapsedWidth='0' {...others}>
             <Logo
-                title={'WebRTC'}
+                title={'Streaming App'}
                 logoPublicPath={'/logo.svg'}
                 color='blue'
                 asLink

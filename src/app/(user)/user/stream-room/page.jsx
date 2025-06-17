@@ -16,7 +16,7 @@ export default function StreamRoomPage() {
 
     const handleCreateRoom = async () => {
         const roomId = await createRoomSmManageRooms();
-        if (roomId) router.push(`stream-room/mesh/${roomId}`);
+        if (roomId) router.push(`stream-room/mesh/${roomId.trim()}`);
     };
 
     return (
