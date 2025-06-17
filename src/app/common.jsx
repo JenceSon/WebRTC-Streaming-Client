@@ -3,6 +3,7 @@ import { client } from '@/core/fetch/fetch_api';
 import { message } from 'antd';
 import *  as lodash from 'lodash-es';
 import { localStorageLib } from './common/local_storage';
+import Chart from 'chart.js/auto';
 import dayjs from 'dayjs';
 
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -119,7 +120,9 @@ const T = {
                 T.socket._singleton[path] = undefined;
             }
         }
-    }
+    },
+    //Statics
+    Chart
 };
 
 // T.socket = socket;

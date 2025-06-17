@@ -169,12 +169,12 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
             },
             [CONNECT]: message => {
                 const { srcUser } = message;
-                if (user.id == srcUser.id) T.message.success('Start stream successfully');
+                if (user?.id == srcUser.id) T.message.success('Start stream successfully');
                 else T.message.info(`${T.string.toUpperCase(srcUser.username, 'word')} has started streaming`);
             },
             [DISCONNECT]: message => {
                 const { srcUser } = message;
-                if (user.id == srcUser.id) T.message.success('Stop stream successfully');
+                if (user?.id == srcUser.id) T.message.success('Stop stream successfully');
                 else T.message.info(`${T.string.toUpperCase(srcUser.username, 'word')} has stopped streaming`);
             },
             [RELEASE_ROOM]: message => {
@@ -249,10 +249,77 @@ export const useWebRtcMesh = ({ socketPath, ontrack }) => {
 
     const release = () => T.socket.singleton(socketPath).send(JSON.stringify({ type: RELEASE_ROOM }));
 
+    const getSndStats = async () => {
+        try {
+            const stats = await sndPeerRef.current?.getStats();
+            const reports = { video: {}, audio: {} };
+            stats?.forEach(report => {
+                if (report.type == 'codec') {
+                    const { mimeType, ...rest } = report;
+                    const [kind, codec] = mimeType.split('/');
+                    if (reports[kind]) {
+                        reports[kind] = T.lodash.merge(reports[kind], { codec, ...rest });
+                    }
+                }
+                if (report.type == 'outbound-rtp') {
+                    const kind = report.kind;
+                    if (kind == 'video') {
+                        const { frameWidth, frameHeight, framesPerSecond, ...rest } = report;
+                        const resolution = `${frameWidth}x${frameHeight}`;
+                        const fps = framesPerSecond;
+                        reports.video = T.lodash.merge(reports.video, { resolution, fps, ...rest });
+                    }
+                    if (kind == 'audio') {
+                        reports.audio = T.lodash.merge(reports.audio, report);
+                    }
+                }
+            });
+            return reports;
+        } catch (error) {
+            console.error(error);
+            T.message.error('Error handling get stats of stream!');
+            return { video: {}, audio: {} };
+        }
+    };
+
+    const getRcvStats = async id => {
+        const reports = { video: {}, audio: {} };
+        try {
+            const rcvPeer = rcvPeersRef.current[id];
+            const stats = await rcvPeer?.getStats();
+            stats.forEach(report => {
+                if (report.type == 'codec') {
+                    const { mimeType, ...rest } = report;
+                    const [kind, codec] = mimeType.split('/');
+                    if (reports[kind]) {
+                        reports[kind] = T.lodash.merge(reports[kind], { codec, ...rest });
+                    }
+                }
+                if (report.type == 'inbound-rtp') {
+                    const kind = report.kind;
+                    if (kind == 'video') {
+                        const { frameWidth, frameHeight, framesPerSecond, ...rest } = report;
+                        const resolution = `${frameWidth}x${frameHeight}`;
+                        const fps = framesPerSecond;
+                        reports.video = T.lodash.merge(reports.video, { resolution, fps, ...rest });
+                    }
+                    if (kind == 'audio') {
+                        reports.audio = T.lodash.merge(reports.audio, report);
+                    }
+                }
+            });
+            return reports;
+        } catch (error) {
+            console.error(error);
+            T.message.error('Error handling get stats of participant\'s stream!');
+            return reports;
+        }
+    };
+
     return {
         getSndPeer: () => sndPeerRef.current,
         getRcvPeers: () => state.rcvPeers,
         getRcvPeer: (id) => state.rcvPeers[id],
-        connect, disconnect, setDefaultTrack, release
+        connect, disconnect, setDefaultTrack, release, getSndStats, getRcvStats
     };
 };

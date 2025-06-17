@@ -6,7 +6,6 @@ import { AdminLayout, loadMenu } from '../components/admin_layout';
 import { useAppDispatch } from '@/hooks/redux_hooks';
 import { useAppRouter } from '@/hooks/router_hook';
 import { fetchSystemState } from '@/app/redux';
-import { T } from '@/app/common';
 
 export default function RootLayout({ children }) {
     const [menus, setMenus] = useState([]);
@@ -20,7 +19,6 @@ export default function RootLayout({ children }) {
             const menus = loadMenu();
             setMenus(menus);
         });
-        return () => T.socket.close();
     }, []);
 
     return (
