@@ -27,7 +27,7 @@ export default function StreamRoomPage() {
     const list = useAppSelector('streamRoom').list;
 
     const handleJoinRoom = async ({ roomId, mediaServer }) => {
-        if (!T.localStorage.storage(livekitRoomPageName)[roomId]) await createParticipantTokenSmManageRoomsV2(roomId);
+        !T.localStorage.storage(livekitRoomPageName)[roomId] && mediaServer == 'livekit' && await createParticipantTokenSmManageRoomsV2(roomId);
         mediaServer == 'kurento' ? router.push(`stream-room/mesh/${roomId}`) : router.push(`stream-room/sfu/${roomId}`);
     };
 
