@@ -16,6 +16,7 @@
     "chart.js": "^4.5.0",
     "dayjs": "^1.11.13",
     "dotenv": "^16.5.0",
+    "livekit-client": "^2.13.5",
     "lodash-es": "^4.17.21",
     "next": "14.2.14",
     "react": "^18",

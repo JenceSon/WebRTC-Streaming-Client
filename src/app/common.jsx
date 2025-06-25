@@ -5,6 +5,7 @@ import *  as lodash from 'lodash-es';
 import { localStorageLib } from './common/local_storage';
 import Chart from 'chart.js/auto';
 import dayjs from 'dayjs';
+import { livekit } from './common/livekit_client';
 
 const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
 const hostname = typeof location !== 'undefined' ? location.hostname : null;
@@ -28,12 +29,12 @@ const T = {
         ...message,
         error: (e) => {
             if (typeof e === 'string') message.error(e);
-            else message.error(e.message || 'Lỗi hệ thống!');
+            else message.error(typeof e.message == 'string' && e.message || 'System Error!');
             console.error(e);
         }
     },
     showLoading: () => {
-        message.loading('Đang xử lý...', 0);
+        message.loading('Processing...', 0);
         //Tạo lớp phủ ngăn người dùng click
         const backdrop = document.createElement('div');
         backdrop.id = 'backdrop-element-unique';
@@ -122,7 +123,63 @@ const T = {
         }
     },
     //Statics
-    Chart
+    Chart,
+    //livekit
+    livekit,
+    //WebRtc
+    webRtc: {
+        formatStats: (stats, type) => {
+            //type: 'snd' || 'rcv'
+            const reports = { video: {}, audio: {} };
+            if (type == 'snd') {
+                stats?.forEach(report => {
+                    if (report.type == 'codec') {
+                        const { mimeType, ...rest } = report;
+                        const [kind, codec] = mimeType.split('/');
+                        if (reports[kind]) {
+                            reports[kind] = T.lodash.merge(reports[kind], { codec, ...rest });
+                        }
+                    }
+                    if (report.type == 'outbound-rtp') {
+                        const kind = report.kind;
+                        if (kind == 'video') {
+                            const { frameWidth, frameHeight, framesPerSecond, ...rest } = report;
+                            const resolution = frameHeight && frameWidth && `${frameWidth}x${frameHeight}` || undefined;
+                            const fps = framesPerSecond;
+                            reports.video = T.lodash.merge(reports.video, { resolution, fps, ...rest });
+                        }
+                        if (kind == 'audio') {
+                            reports.audio = T.lodash.merge(reports.audio, report);
+                        }
+                    }
+                });
+            }
+            if (type == 'rcv') {
+                stats.forEach(report => {
+                    if (report.type == 'codec') {
+                        const { mimeType, ...rest } = report;
+                        const [kind, codec] = mimeType.split('/');
+                        if (reports[kind]) {
+                            reports[kind] = T.lodash.merge(reports[kind], { codec, ...rest });
+                        }
+                    }
+                    if (report.type == 'inbound-rtp') {
+                        const kind = report.kind;
+                        if (kind == 'video') {
+                            const { frameWidth, frameHeight, framesPerSecond, ...rest } = report;
+                            const resolution = `${frameWidth}x${frameHeight}`;
+                            const fps = framesPerSecond;
+                            reports.video = T.lodash.merge(reports.video, { resolution, fps, ...rest });
+                        }
+                        if (kind == 'audio') {
+                            reports.audio = T.lodash.merge(reports.audio, report);
+                        }
+                    }
+                });
+            }
+            return reports;
+        }
+    }
 };
 
 // T.socket = socket;

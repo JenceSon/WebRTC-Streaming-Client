@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 
 const MAX_VISIBLE = 4;
 
-export default function DetailStatsPopover({ user, video, audio, children }) {
+export default function DetailStatsPopover({ user, username, video, audio, children }) {
     const convertStats = report => {
         const descriptionItems = [];
         Object.entries(report).forEach(([key, value]) => {
@@ -53,7 +53,7 @@ export default function DetailStatsPopover({ user, video, audio, children }) {
     );
 
     return (
-        <Popover title={user?.username || ''} content={content} trigger='click'>
+        <Popover title={user?.username || username || ''} content={content} trigger='click'>
             {children}
         </Popover>
     );
